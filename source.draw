@@ -1,0 +1,16 @@
+canvas 400 300;
+pattern flower(x, y, size) {
+  pen "pink";
+  circle(x, y - size, size); circle(x, y + size, size);
+  circle(x - size, y, size); circle(x + size, y, size);
+  pen "yellow";
+  circle(x, y, size);
+}
+ink i = 0;
+swirl (i < 3) { flower(80 + i * 120, 100, 20); i = i + 1; }
+ink level = 2;
+when (level > 1) {
+  when (level > 5) { pen "red"; } otherwise { pen "blue"; }
+  rect(20, 220, 360, 40);
+}
+stamp 5 times { circle(50, 50, 10); slide 20 0; }

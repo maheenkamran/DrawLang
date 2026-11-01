@@ -1,0 +1,31 @@
+// Rotating and scaling patterns with spin and grow.
+canvas 400 400;
+
+// Move the drawing position to the centre; spin/grow pivot on it.
+slide 200 200;
+
+// Twelve petals: each pass rotates a triangle by a further 30 degrees.
+ink k = 0;
+stamp 12 times {
+  when (k % 2 == 0) { pen "crimson"; } otherwise { pen "orange"; }
+  spin(k * 30) {
+    triangle(0, 0, -20, -150, 20, -150);
+  }
+  k = k + 1;
+}
+
+// Concentric rings drawn by scaling one circle.
+ink s = 3;
+swirl (s > 0) {
+  when (s == 3) { pen "gold"; }
+  otherwise when (s == 2) { pen "#ffffff"; }
+  otherwise { pen "darkred"; }
+  grow(s) { circle(0, 0, 15); }
+  s = s - 1;
+}
+
+// Spokes and a label.
+pen "black";
+spin(45) { line(0, -190, 0, 190); }
+spin(-45) { line(0, -190, 0, 190); }
+text(-60, 185, 20, "DrawLang");
