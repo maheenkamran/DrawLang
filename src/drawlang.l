@@ -1,3 +1,4 @@
+
 %option noyywrap nounput noinput yylineno
 
 %{
@@ -26,14 +27,31 @@ static char *unquote(const char *s, int len)
 }
 %}
 
+%x COMMENT
+
 %%
 
 "//".*                  { /* line comment */ }
+"/*"                    { BEGIN(COMMENT); }
+<COMMENT>"*/"           { BEGIN(INITIAL); }
+<COMMENT>.|\n           { }
+<COMMENT><<EOF>>        { fprintf(stderr, "%s:%d: error: unterminated comment\n", src_name, yylineno); exit(1); }
 
 [ \t\r\n]+              { /* whitespace */ }
 
 "canvas"                { return CANVAS; }
 "pen"                   { return PEN; }
+"slide"                 { return SLIDE; }
+"spin"                  { return SPIN; }
+"grow"                  { return GROW; }
+"ink"                   { return INK; }
+"when"                  { return WHEN; }
+"otherwise"             { return OTHERWISE; }
+"swirl"                 { return SWIRL; }
+"stamp"                 { return STAMP; }
+"times"                 { return TIMES; }
+"pattern"               { return PATTERN; }
+"give"                  { return GIVE; }
 "circle"                { yylval.ival = SH_CIRCLE;   return SHAPE; }
 "rect"                  { yylval.ival = SH_RECT;     return SHAPE; }
 "line"                  { yylval.ival = SH_LINE;     return SHAPE; }
@@ -42,7 +60,7 @@ static char *unquote(const char *s, int len)
 
 [0-9]+(\.[0-9]+)?       { yylval.num = strtod(yytext, NULL); return NUMBER; }
 [A-Za-z_][A-Za-z0-9_]*  { yylval.str = strdup(yytext); return IDENT; }
-\"([^\"\\\n]|\\.)*\"     { yylval.str = unquote(yytext, yyleng); return STRING; }
+\"([^"\\\n]|\\.)*\"     { yylval.str = unquote(yytext, yyleng); return STRING; }
 
 "<="                    { return LE; }
 ">="                    { return GE; }
@@ -51,5 +69,7 @@ static char *unquote(const char *s, int len)
 "&&"                    { return AND; }
 "||"                    { return OR; }
 [-+*/%<>=!(){},;]       { return yytext[0]; }
+
+.                       { fprintf(stderr, "%s:%d: error: unexpected character '%s'\n", src_name, yylineno, yytext); exit(1); }
 
 %%
