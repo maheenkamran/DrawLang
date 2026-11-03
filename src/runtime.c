@@ -13,6 +13,11 @@ static const char *pen = "black";
 static double off_x, off_y;
 static int depth;
 
+static void indent(void)
+{
+    for (int i = 0; i <= depth; i++) fputs("  ", out);
+}
+
 void svg_begin(double w, double h)
 {
     out = fopen(OUTPUT_FILE, "w");
@@ -37,31 +42,69 @@ void svg_slide(double dx, double dy) { off_x += dx; off_y += dy; }
 void svg_circle(int line, double x, double y, double r)
 {
     (void)line;
-    fprintf(out, "  <circle cx=\"%g\" cy=\"%g\" r=\"%g\" fill=\"%s\"/>\n", x + off_x, y + off_y, r, pen);
+    indent();
+    fprintf(out, "<circle cx=\"%g\" cy=\"%g\" r=\"%g\" fill=\"%s\"/>\n", x + off_x, y + off_y, r, pen);
 }
 
 void svg_rect(int line, double x, double y, double w, double h)
 {
     (void)line;
-    fprintf(out, "  <rect x=\"%g\" y=\"%g\" width=\"%g\" height=\"%g\" fill=\"%s\"/>\n", x + off_x, y + off_y, w, h, pen);
+    indent();
+    fprintf(out, "<rect x=\"%g\" y=\"%g\" width=\"%g\" height=\"%g\" fill=\"%s\"/>\n", x + off_x, y + off_y, w, h, pen);
 }
 
 void svg_line(int line, double x1, double y1, double x2, double y2)
 {
     (void)line;
-    fprintf(out, "  <line x1=\"%g\" y1=\"%g\" x2=\"%g\" y2=\"%g\" stroke=\"%s\" stroke-width=\"2\"/>\n",
+    indent();
+    fprintf(out, "<line x1=\"%g\" y1=\"%g\" x2=\"%g\" y2=\"%g\" stroke=\"%s\" stroke-width=\"2\"/>\n",
             x1 + off_x, y1 + off_y, x2 + off_x, y2 + off_y, pen);
 }
 
 void svg_triangle(int line, double x1, double y1, double x2, double y2, double x3, double y3)
 {
     (void)line;
-    fprintf(out, "  <polygon points=\"%g,%g %g,%g %g,%g\" fill=\"%s\"/>\n",
+    indent();
+    fprintf(out, "<polygon points=\"%g,%g %g,%g %g,%g\" fill=\"%s\"/>\n",
             x1 + off_x, y1 + off_y, x2 + off_x, y2 + off_y, x3 + off_x, y3 + off_y, pen);
 }
 
 void svg_text(int line, double x, double y, double size, const char *s)
 {
     (void)line;
-    fprintf(out, "  <text x=\"%g\" y=\"%g\" font-size=\"%g\" fill=\"%s\">%s</text>\n", x + off_x, y + off_y, size, pen, s);
+    indent();
+    fprintf(out, "<text x=\"%g\" y=\"%g\" font-size=\"%g\" fill=\"%s\">", x + off_x, y + off_y, size, pen);
+    for (; *s; s++) {
+        switch (*s) {
+        case '<': fputs("&lt;", out); break;
+        case '>': fputs("&gt;", out); break;
+        case '&': fputs("&amp;", out); break;
+        default: fputc(*s, out);
+        }
+    }
+    fputs("</text>\n", out);
+}
+
+void svg_spin_begin(int line, double angle)
+{
+    (void)line;
+    indent();
+    fprintf(out, "<g transform=\"rotate(%g %g %g)\">\n", angle, off_x, off_y);
+    depth++;
+}
+
+void svg_grow_begin(int line, double factor)
+{
+    (void)line;
+    indent();
+    fprintf(out, "<g transform=\"translate(%g %g) scale(%g) translate(%g %g)\">\n",
+            off_x, off_y, factor, 0.0 - off_x, 0.0 - off_y);
+    depth++;
+}
+
+void svg_group_end(void)
+{
+    depth--;
+    indent();
+    fputs("</g>\n", out);
 }
