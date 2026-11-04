@@ -62,6 +62,9 @@ stmt
     : CANVAS NUMBER NUMBER ';'          { $$ = mk(N_CANVAS, @1.first_line); $$->num = $2; $$->num2 = $3; }
     | PEN STRING ';'                    { $$ = mk_str(N_PEN, $2, @1.first_line); }
     | SHAPE '(' args ')' ';'            { $$ = mk(N_SHAPE, @1.first_line); $$->op = $1; $$->args = $3; }
+    | SLIDE unary unary ';'             { $$ = mk(N_SLIDE, @1.first_line); $$->a = $2; $$->b = $3; }
+    | SPIN '(' expr ')' block           { $$ = mk(N_SPIN, @1.first_line); $$->a = $3; $$->body = $5; }
+    | GROW '(' expr ')' block           { $$ = mk(N_GROW, @1.first_line); $$->a = $3; $$->body = $5; }
     | INK IDENT '=' expr ';'            { $$ = mk_str(N_INK, $2, @1.first_line); $$->a = $4; }
     | IDENT '=' expr ';'                { $$ = mk_str(N_ASSIGN, $1, @1.first_line); $$->a = $3; }
     | IDENT '(' args ')' ';'            { $$ = mk(N_CALLSTMT, @1.first_line);
@@ -69,6 +72,9 @@ stmt
     | when_stmt                         { $$ = $1; }
     | SWIRL '(' expr ')' block          { $$ = mk(N_SWIRL, @1.first_line); $$->a = $3; $$->body = $5; }
     | STAMP expr TIMES block            { $$ = mk(N_STAMP, @1.first_line); $$->a = $2; $$->body = $4; }
+    | PATTERN IDENT '(' params ')' block
+                                        { $$ = mk_str(N_PATTERN, $2, @1.first_line); $$->params = $4; $$->body = $6; }
+    | GIVE expr ';'                     { $$ = mk(N_GIVE, @1.first_line); $$->a = $2; }
     ;
 
 /* `otherwise when (...)` chains without extra braces. */
