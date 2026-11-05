@@ -204,16 +204,91 @@ static double eval(const Node *e, double *frame)
     return 0.0;
 }
 
+static void exec_shape(const Node *st, double *frame)
+{
+    double v[6];
+    const char *label = "";
+    int i = 0;
+    for (const Node *a = st->args; a; a = a->next) {
+        if (a->kind == N_STR) label = a->str;
+        else v[i++] = eval(a, frame);
+    }
+    switch (st->op) {
+    case SH_CIRCLE:   svg_circle(st->line, v[0], v[1], v[2]); break;
+    case SH_RECT:     svg_rect(st->line, v[0], v[1], v[2], v[3]); break;
+    case SH_LINE:     svg_line(st->line, v[0], v[1], v[2], v[3]); break;
+    case SH_TRIANGLE: svg_triangle(st->line, v[0], v[1], v[2], v[3], v[4], v[5]); break;
+    case SH_TEXT:     svg_text(st->line, v[0], v[1], v[2], label); break;
+    }
+}
 
-static void exec_stmt(const Node *st, double *frame) { (void)st; (void)frame; }
-static void exec_list(const Node *list, double *frame) { (void)list; (void)frame; }
-static void run_program(Node *prog) {
+static void exec_stmt(const Node *st, double *frame)
+{
+    switch (st->kind) {
+    case N_CANVAS: svg_begin(st->num, st->num2); break;
+    case N_PEN:    svg_pen(st->str); break;
+    case N_SHAPE:  exec_shape(st, frame); break;
+    case N_SLIDE: {
+        double dx = eval(st->a, frame), dy = eval(st->b, frame);
+        svg_slide(dx, dy);
+        break;
+    }
+    case N_SPIN:
+        svg_spin_begin(st->line, eval(st->a, frame));
+        exec_list(st->body, frame);
+        svg_group_end();                 /* also closes on `give` */
+        break;
+    case N_GROW:
+        svg_grow_begin(st->line, eval(st->a, frame));
+        exec_list(st->body, frame);
+        svg_group_end();
+        break;
+    case N_INK:
+    case N_ASSIGN: frame[st->slot] = eval(st->a, frame); break;
+    case N_WHEN:
+        if (eval(st->a, frame) != 0.0) exec_list(st->body, frame);
+        else exec_list(st->els, frame);
+        break;
+    case N_SWIRL:
+        while (!returning && eval(st->a, frame) != 0.0)
+            exec_list(st->body, frame);
+        break;
+    case N_STAMP:
+        /* Count is evaluated once; runs while counter < count. */
+        frame[st->slot + 1] = eval(st->a, frame);
+        for (frame[st->slot] = 0; !returning && frame[st->slot] < frame[st->slot + 1]; frame[st->slot] += 1)
+            exec_list(st->body, frame);
+        break;
+    case N_GIVE:
+        return_value = eval(st->a, frame);
+        returning = 1;
+        break;
+    case N_CALLSTMT: call_pattern(st->a, frame); break;
+    case N_PATTERN: break;               /* definitions do nothing when reached */
+    default: break;
+    }
+}
+
+static void exec_list(const Node *list, double *frame)
+{
+    for (; list && !returning; list = list->next)
+        exec_stmt(list, frame);
+}
+
+static void run_program(Node *prog)
+{
     int nslots;
     if (check_program(prog, &nslots) > 0) exit(1);
+    double *frame = calloc(nslots ? nslots : 1, sizeof *frame);
+    exec_list(prog, frame);
+    svg_end();
+    free(frame);
 }
-int main(int argc, char **argv) {
+
+int main(int argc, char **argv)
+{
     if (argc > 1) src_name = argv[1];
     yyin = fopen(src_name, "r");
-    if (!yyin) return 1;
+    if (!yyin) { perror(src_name); return 1; }
     return yyparse() != 0;
 }
