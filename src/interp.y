@@ -45,7 +45,15 @@ static void run_program(Node *prog);
 %start program
 
 
+/*
+ * Note on shift-reduce conflict:
+ * slide takes two unparenthesised unary expressions (e.g. `slide 10 20;`).
+ * When followed by an identifier and an argument list `foo (x)`, a shift-reduce
+ * conflict arises because `foo` could either be an argument expression or the start
+ * of a pattern call. Bison defaults to shift, which resolves the ambiguity as intended.
+ */
 %expect 1
+
 
 %%
 
@@ -138,20 +146,7 @@ unary
     ;
 
 primary
-    : NUMBER                            { $$ = mk_num($1, @1.first_line); }
-    | IDENT                             { $$ = mk_str(N_VAR, $1, @1.first_line); }
-    | IDENT '(' args ')'                { $$ = mk_str(N_CALL, $1, @1.first_line); $$->args = $3; }
-    | '(' expr ')'                      { $$ = $2; }
-    ;
-
-%%
-
-static void yyerror(const char *msg)
-{
-    fprintf(stderr, "%s:%d: %s\n", src_name, yylloc.first_line, msg);
-}
-
-
+    : NUMBER                            { $$ = mk_num($1, @1.
 static void run_program(Node *prog) { (void)prog; }
 int main(int argc, char **argv) {
     if (argc > 1) src_name = argv[1];
