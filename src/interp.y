@@ -45,15 +45,7 @@ static void run_program(Node *prog);
 %start program
 
 
-/*
- * Note on shift-reduce conflict:
- * slide takes two unparenthesised unary expressions (e.g. `slide 10 20;`).
- * When followed by an identifier and an argument list `foo (x)`, a shift-reduce
- * conflict arises because `foo` could either be an argument expression or the start
- * of a pattern call. Bison defaults to shift, which resolves the ambiguity as intended.
- */
 %expect 1
-
 
 %%
 
@@ -146,8 +138,79 @@ unary
     ;
 
 primary
-    : NUMBER                            { $$ = mk_num($1, @1.
-static void run_program(Node *prog) { (void)prog; }
+    : NUMBER                            { $$ = mk_num($1, @1.first_line); }
+    | IDENT                             { $$ = mk_str(N_VAR, $1, @1.first_line); }
+    | IDENT '(' args ')'                { $$ = mk_str(N_CALL, $1, @1.first_line); $$->args = $3; }
+    | '(' expr ')'                      { $$ = $2; }
+    ;
+
+%%
+
+static void yyerror(const char *msg)
+{
+    fprintf(stderr, "%s:%d: %s\n", src_name, yylloc.first_line, msg);
+}
+
+static int returning;
+static double return_value;
+
+static double eval(const Node *e, double *frame);
+static void exec_list(const Node *list, double *frame);
+
+static double call_pattern(const Node *call, double *frame)
+{
+    const Node *p = call->target;
+    double *callee = calloc(p->nslots ? p->nslots : 1, sizeof *callee);
+    int i = 0;
+    for (const Node *a = call->args; a; a = a->next)   /* left to right */
+        callee[i++] = eval(a, frame);
+    exec_list(p->body, callee);
+    double result = returning ? return_value : 0.0;    /* no give -> 0 */
+    returning = 0;
+    free(callee);
+    return result;
+}
+
+static double eval(const Node *e, double *frame)
+{
+    double a, b;
+    switch (e->kind) {
+    case N_NUM: return e->num;
+    case N_VAR: return frame[e->slot];
+    case N_NEG: return -eval(e->a, frame);
+    case N_NOT: return eval(e->a, frame) == 0.0 ? 1.0 : 0.0;
+    case N_AND: return (eval(e->a, frame) != 0.0 && eval(e->b, frame) != 0.0) ? 1.0 : 0.0;
+    case N_OR:  return (eval(e->a, frame) != 0.0 || eval(e->b, frame) != 0.0) ? 1.0 : 0.0;
+    case N_CALL: return call_pattern(e, frame);
+    case N_BIN:
+        a = eval(e->a, frame);
+        b = eval(e->b, frame);
+        switch (e->op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+        case '%': return fmod(a, b);
+        case '<': return a < b;
+        case '>': return a > b;
+        case OP_LE: return a <= b;
+        case OP_GE: return a >= b;
+        case OP_EQ: return a == b;
+        case OP_NE: return a != b;
+        }
+        break;
+    default: break;
+    }
+    return 0.0;
+}
+
+
+static void exec_stmt(const Node *st, double *frame) { (void)st; (void)frame; }
+static void exec_list(const Node *list, double *frame) { (void)list; (void)frame; }
+static void run_program(Node *prog) {
+    int nslots;
+    if (check_program(prog, &nslots) > 0) exit(1);
+}
 int main(int argc, char **argv) {
     if (argc > 1) src_name = argv[1];
     yyin = fopen(src_name, "r");
