@@ -196,7 +196,7 @@ static void check_shape(Node *st, Scope *s)
         }
         if (a->kind == N_STR) { error(a->line, "a string is only allowed as the last argument of text()"); constant = 0; continue; }
         check_expr(a, s);
-        constant = 0;
+        if (!fold(a, &v[i])) constant = 0;
     }
     char msg[256];
     if (constant && off_known && dl_shape_error(kind, v, off_x, off_y, canvas_w, canvas_h, msg, sizeof msg))
@@ -282,6 +282,20 @@ static void collect_patterns(Node *list)
     }
 }
 
+static void check_pattern(Node *p)
+{
+    static Scope s;
+    memset(&s, 0, sizeof s);
+    s.in_pattern = 1;
+    off_known = !program_slides && !pattern_slides;
+    off_x = off_y = 0;
+    for (Node *prm = p->params; prm; prm = prm->next)
+        prm->slot = declare(&s, prm->str, prm->line);
+    check_list(p->body, &s, 0);
+    s.nslots = s.count;
+    assign_hidden(p->body, &s);
+    p->nslots = s.nslots;
+}
 
 int check_program(Node *prog, int *main_slots)
 {
@@ -292,9 +306,13 @@ int check_program(Node *prog, int *main_slots)
         canvas_w = prog->num; canvas_h = prog->num2;
         if (canvas_w <= 0 || canvas_h <= 0) error(prog->line, "canvas size must be positive");
     }
+    collect_patterns(prog);
+    for (Node *p = patterns; p; p = p->target) pattern_slides |= has_slide(p->body);
+    program_slides = has_slide(prog);
     check_list(prog, &s, 1);
     s.nslots = s.count;
     assign_hidden(prog, &s);
     *main_slots = s.nslots;
+    for (Node *p = patterns; p; p = p->target) check_pattern(p);
     return errors;
 }
