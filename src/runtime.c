@@ -78,7 +78,7 @@ int dl_shape_error(int kind, const double *v, double ox, double oy,
 
 static void runtime_error(int line, const char *msg)
 {
-    fprintf(stderr, "runtime error: %s\n", msg);
+    fprintf(stderr, "line %d: runtime error: %s\n", line, msg);
     if (out) { fclose(out); remove(OUTPUT_FILE); }
     exit(1);
 }
