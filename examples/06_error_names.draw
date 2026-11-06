@@ -1,0 +1,13 @@
+// Compile-time errors: names and argument counts. Nothing is drawn.
+canvas 300 300;
+
+pattern dot(x, y) {
+  circle(x, y, 3);
+}
+
+circle(10, 20);            // circle needs 3 arguments
+triangle(1, 2, 3, 4);      // triangle needs 6 arguments
+dot(5, 5, 5);              // dot takes 2 arguments
+ink a = b + 1;             // b was never declared
+size = 4;                  // size was never declared
+star(10, 10);              // no pattern called star

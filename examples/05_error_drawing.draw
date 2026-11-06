@@ -1,0 +1,9 @@
+// Compile-time errors: drawing checks. Nothing is drawn.
+canvas 200 200;
+
+pen "pinkish";             // unknown colour
+circle(100, 100, -5);      // negative radius
+rect(150, 150, 100, 20);   // runs off the right edge of the canvas
+line(10, 10, 10, 250);     // end point below the canvas
+grow(-2) { circle(50, 50, 5); }   // negative scale factor
+text(10, 10, -3, "hi");    // negative text size
