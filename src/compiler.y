@@ -365,64 +365,6 @@ static void gen_stmt(const Node *st)
         fprintf(ir, "  store double %s, ptr %%s%d\n", a.s, st->slot);
         break;
     case N_WHEN:
-    case N_SWIRL:
-    case N_STAMP:
-    default: break;
-    }
-}
-static void gen_list(const Node *list);
-
-static void gen_shape(const Node *st)
-{
-    static const char *fn[SH_COUNT] = { "svg_circle", "svg_rect", "svg_line", "svg_triangle", "svg_text" };
-    Val vals[6];
-    int n = gen_args(st->args, vals);
-    int label = -1;
-    if (st->op == SH_TEXT) {
-        const Node *a = st->args;
-        while (a->next) a = a->next;    /* the checker guarantees a string here */
-        label = string_const(a->str);
-    }
-    fprintf(ir, "  call void @%s(i32 %d", fn[st->op], st->line);
-    for (int i = 0; i < n; i++) fprintf(ir, ", double %s", vals[i].s);
-    if (label >= 0) fprintf(ir, ", ptr @.str%d", label);
-    fputs(")\n", ir);
-}
-
-static void gen_stmt(const Node *st)
-{
-    Val a, b, c;
-    int l1, l2, l3;
-    switch (st->kind) {
-    case N_CANVAS:
-        fprintf(ir, "  call void @svg_begin(double %s, double %s)\n",
-                constant(st->num).s, constant(st->num2).s);
-        break;
-    case N_PEN:
-        fprintf(ir, "  call void @svg_pen(ptr @.str%d)\n", string_const(st->str));
-        break;
-    case N_SHAPE: gen_shape(st); break;
-    case N_SLIDE:
-        a = gen_expr(st->a);
-        b = gen_expr(st->b);
-        fprintf(ir, "  call void @svg_slide(double %s, double %s)\n", a.s, b.s);
-        break;
-    case N_SPIN:
-    case N_GROW:
-        a = gen_expr(st->a);
-        fprintf(ir, "  call void @%s(i32 %d, double %s)\n",
-                st->kind == N_SPIN ? "svg_spin_begin" : "svg_grow_begin", st->line, a.s);
-        open_groups++;
-        gen_list(st->body);
-        open_groups--;
-        fputs("  call void @svg_group_end()\n", ir);
-        break;
-    case N_INK:
-    case N_ASSIGN:
-        a = gen_expr(st->a);
-        fprintf(ir, "  store double %s, ptr %%s%d\n", a.s, st->slot);
-        break;
-    case N_WHEN:
         l1 = new_label(); l2 = new_label(); l3 = new_label();
         c = truth(gen_expr(st->a));
         fprintf(ir, "  br i1 %s, label %%L%d, label %%L%d\n", c.s, l1, l2);
@@ -475,7 +417,8 @@ static void gen_stmt(const Node *st)
         start_block(new_label());                      /* unreachable code after give */
         break;
     case N_CALLSTMT: gen_call(st->a); break;
-    case N_PATTERN: break;                             /* emitted separately */
+    case N_PATTERN: break;
+    /* patterns added next */                             /* emitted separately */
     default: break;
     }
 }
@@ -491,29 +434,14 @@ static void gen_allocas(int nslots)
     for (int i = 0; i < nslots; i++) fprintf(ir, "  store double 0.0, ptr %%s%d\n", i);
 }
 
-static void gen_pattern(const Node *p)
-{
-    fprintf(ir, "\ndefine double @dl_%s(", p->str);
-    for (int i = 0; i < p->nparams; i++) fprintf(ir, "%sdouble %%p%d", i ? ", " : "", i);
-    fputs(") {\nentry:\n", ir);
-    strcpy(cur_label, "entry");
-    gen_allocas(p->nslots);
-    for (int i = 0; i < p->nparams; i++) fprintf(ir, "  store double %%p%d, ptr %%s%d\n", i, i);
-    open_groups = 0;
-    gen_list(p->body);
-    fputs("  ret double 0.0\n}\n", ir);               /* no give -> 0 */
-}
 
-/* Start-rule action: check everything, then print the whole module. */
 static void compile_program(Node *prog)
 {
     int nslots;
     if (check_program(prog, &nslots) > 0) exit(1);
-
     ir = fopen(out_name, "w");
     if (!ir) { perror(out_name); exit(1); }
     strs = open_memstream(&strs_buf, &strs_len);
-
     fprintf(ir, "; DrawLang program compiled from %s\n\n", src_name);
     fputs("declare void @svg_begin(double, double)\n"
           "declare void @svg_end()\n"
@@ -527,23 +455,17 @@ static void compile_program(Node *prog)
           "declare void @svg_spin_begin(i32, double)\n"
           "declare void @svg_grow_begin(i32, double)\n"
           "declare void @svg_group_end()\n", ir);
-
-    for (const Node *st = prog; st; st = st->next)
-        if (st->kind == N_PATTERN) gen_pattern(st);
-
     fputs("\ndefine i32 @main() {\nentry:\n", ir);
     strcpy(cur_label, "entry");
     gen_allocas(nslots);
     open_groups = 0;
     gen_list(prog);
     fputs("  call void @svg_end()\n  ret i32 0\n}\n", ir);
-
     fclose(strs);
     fprintf(ir, "\n%s", strs_buf);
     free(strs_buf);
     fclose(ir);
 }
-
 int main(int argc, char **argv)
 {
     for (int i = 1; i < argc; i++) {
