@@ -498,11 +498,44 @@ int main(int argc, char **argv)
     printf("wrote %s\n", out_name);
     return 0;
 }
+static void gen_allocas(int nslots)
+{
+    for (int i = 0; i < nslots; i++) fprintf(ir, "  %%s%d = alloca double\n", i);
+    for (int i = 0; i < nslots; i++) fprintf(ir, "  store double 0.0, ptr %%s%d\n", i);
+}
+
 static void compile_program(Node *prog)
 {
     int nslots;
     if (check_program(prog, &nslots) > 0) exit(1);
-    printf("; compiler.y stub\n");
+
+    ir = fopen(out_name, "w");
+    if (!ir) { perror(out_name); exit(1); }
+    strs = open_memstream(&strs_buf, &strs_len);
+
+    fprintf(ir, "; DrawLang program compiled from %s\n\n", src_name);
+    fputs("declare void @svg_begin(double, double)\n"
+          "declare void @svg_end()\n"
+          "declare void @svg_pen(ptr)\n"
+          "declare void @svg_slide(double, double)\n"
+          "declare void @svg_circle(i32, double, double, double)\n"
+          "declare void @svg_rect(i32, double, double, double, double)\n"
+          "declare void @svg_line(i32, double, double, double, double)\n"
+          "declare void @svg_triangle(i32, double, double, double, double, double, double)\n"
+          "declare void @svg_text(i32, double, double, double, ptr)\n"
+          "declare void @svg_spin_begin(i32, double)\n"
+          "declare void @svg_grow_begin(i32, double)\n"
+          "declare void @svg_group_end()\n", ir);
+
+    fputs("\ndefine i32 @main() {\nentry:\n", ir);
+    strcpy(cur_label, "entry");
+    gen_allocas(nslots);
+    fputs("  call void @svg_end()\n  ret i32 0\n}\n", ir);
+
+    fclose(strs);
+    fprintf(ir, "\n%s", strs_buf);
+    free(strs_buf);
+    fclose(ir);
 }
 
 int main(int argc, char **argv)
@@ -514,5 +547,6 @@ int main(int argc, char **argv)
     yyin = fopen(src_name, "r");
     if (!yyin) { perror(src_name); return 1; }
     if (yyparse() != 0) return 1;
+    printf("wrote %s\n", out_name);
     return 0;
 }
