@@ -365,139 +365,31 @@ static void gen_stmt(const Node *st)
         fprintf(ir, "  store double %s, ptr %%s%d\n", a.s, st->slot);
         break;
     case N_WHEN:
-        l1 = new_label(); l2 = new_label(); l3 = new_label();
-        c = truth(gen_expr(st->a));
-        fprintf(ir, "  br i1 %s, label %%L%d, label %%L%d\n", c.s, l1, l2);
-        start_block(l1);
-        gen_list(st->body);
-        fprintf(ir, "  br label %%L%d\n", l3);
-        start_block(l2);
-        gen_list(st->els);
-        fprintf(ir, "  br label %%L%d\n", l3);
-        start_block(l3);
-        break;
     case N_SWIRL:
-        l1 = new_label(); l2 = new_label(); l3 = new_label();
-        fprintf(ir, "  br label %%L%d\n", l1);
-        start_block(l1);                                  /* condition */
-        c = truth(gen_expr(st->a));
-        fprintf(ir, "  br i1 %s, label %%L%d, label %%L%d\n", c.s, l2, l3);
-        start_block(l2);                                  /* body */
-        gen_list(st->body);
-        fprintf(ir, "  br label %%L%d\n", l1);
-        start_block(l3);                                  /* exit */
-        break;
     case N_STAMP:
-        /* counter in slot, limit in slot+1; count evaluated once */
-        a = gen_expr(st->a);
-        fprintf(ir, "  store double %s, ptr %%s%d\n", a.s, st->slot + 1);
-        fprintf(ir, "  store double 0.0, ptr %%s%d\n", st->slot);
-        l1 = new_label(); l2 = new_label(); l3 = new_label();
-        fprintf(ir, "  br label %%L%d\n", l1);
-        start_block(l1);
-        a = reg(); b = reg(); c = reg();
-        fprintf(ir, "  %s = load double, ptr %%s%d\n", a.s, st->slot);
-        fprintf(ir, "  %s = load double, ptr %%s%d\n", b.s, st->slot + 1);
-        fprintf(ir, "  %s = fcmp olt double %s, %s\n", c.s, a.s, b.s);
-        fprintf(ir, "  br i1 %s, label %%L%d, label %%L%d\n", c.s, l2, l3);
-        start_block(l2);
-        gen_list(st->body);
-        a = reg(); b = reg();
-        fprintf(ir, "  %s = load double, ptr %%s%d\n", a.s, st->slot);
-        fprintf(ir, "  %s = fadd double %s, 1.0\n", b.s, a.s);
-        fprintf(ir, "  store double %s, ptr %%s%d\n", b.s, st->slot);
-        fprintf(ir, "  br label %%L%d\n", l1);
-        start_block(l3);
-        break;
-    case N_GIVE:
-        a = gen_expr(st->a);
-        for (int i = 0; i < open_groups; i++)          /* close open spin/grow */
-            fputs("  call void @svg_group_end()\n", ir);
-        fprintf(ir, "  ret double %s\n", a.s);
-        start_block(new_label());                      /* unreachable code after give */
-        break;
-    case N_CALLSTMT: gen_call(st->a); break;
-    case N_PATTERN: break;                             /* emitted separately */
     default: break;
     }
 }
+static void gen_list(const Node *list);
 
-static void gen_list(const Node *list)
+static void gen_shape(const Node *st)
 {
-    for (; list; list = list->next) gen_stmt(list);
-}
-
-static void gen_allocas(int nslots)
-{
-    for (int i = 0; i < nslots; i++) fprintf(ir, "  %%s%d = alloca double\n", i);
-    for (int i = 0; i < nslots; i++) fprintf(ir, "  store double 0.0, ptr %%s%d\n", i);
-}
-
-static void gen_pattern(const Node *p)
-{
-    fprintf(ir, "\ndefine double @dl_%s(", p->str);
-    for (int i = 0; i < p->nparams; i++) fprintf(ir, "%sdouble %%p%d", i ? ", " : "", i);
-    fputs(") {\nentry:\n", ir);
-    strcpy(cur_label, "entry");
-    gen_allocas(p->nslots);
-    for (int i = 0; i < p->nparams; i++) fprintf(ir, "  store double %%p%d, ptr %%s%d\n", i, i);
-    open_groups = 0;
-    gen_list(p->body);
-    fputs("  ret double 0.0\n}\n", ir);               /* no give -> 0 */
-}
-
-/* Start-rule action: check everything, then print the whole module. */
-static void compile_program(Node *prog)
-{
-    int nslots;
-    if (check_program(prog, &nslots) > 0) exit(1);
-
-    ir = fopen(out_name, "w");
-    if (!ir) { perror(out_name); exit(1); }
-    strs = open_memstream(&strs_buf, &strs_len);
-
-    fprintf(ir, "; DrawLang program compiled from %s\n\n", src_name);
-    fputs("declare void @svg_begin(double, double)\n"
-          "declare void @svg_end()\n"
-          "declare void @svg_pen(ptr)\n"
-          "declare void @svg_slide(double, double)\n"
-          "declare void @svg_circle(i32, double, double, double)\n"
-          "declare void @svg_rect(i32, double, double, double, double)\n"
-          "declare void @svg_line(i32, double, double, double, double)\n"
-          "declare void @svg_triangle(i32, double, double, double, double, double, double)\n"
-          "declare void @svg_text(i32, double, double, double, ptr)\n"
-          "declare void @svg_spin_begin(i32, double)\n"
-          "declare void @svg_grow_begin(i32, double)\n"
-          "declare void @svg_group_end()\n", ir);
-
-    for (const Node *st = prog; st; st = st->next)
-        if (st->kind == N_PATTERN) gen_pattern(st);
-
-    fputs("\ndefine i32 @main() {\nentry:\n", ir);
-    strcpy(cur_label, "entry");
-    gen_allocas(nslots);
-    open_groups = 0;
-    gen_list(prog);
-    fputs("  call void @svg_end()\n  ret i32 0\n}\n", ir);
-
-    fclose(strs);
-    fprintf(ir, "\n%s", strs_buf);
-    free(strs_buf);
-    fclose(ir);
-}
-
-int main(int argc, char **argv)
-{
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) out_name = argv[++i];
-        else src_name = argv[i];
+    static const char *fn[SH_COUNT] = { "svg_circle", "svg_rect", "svg_line", "svg_triangle", "svg_text" };
+    Val vals[6];
+    int n = gen_args(st->args, vals);
+    int label = -1;
+    if (st->op == SH_TEXT) {
+        const Node *a = st->args;
+        while (a->next) a = a->next;    /* the checker guarantees a string here */
+        label = string_const(a->str);
     }
-    yyin = fopen(src_name, "r");
-    if (!yyin) { perror(src_name); return 1; }
-    if (yyparse() != 0) return 1;
-    printf("wrote %s\n", out_name);
-    return 0;
-}static void gen_stmt(const Node *st)
+    fprintf(ir, "  call void @%s(i32 %d", fn[st->op], st->line);
+    for (int i = 0; i < n; i++) fprintf(ir, ", double %s", vals[i].s);
+    if (label >= 0) fprintf(ir, ", ptr @.str%d", label);
+    fputs(")\n", ir);
+}
+
+static void gen_stmt(const Node *st)
 {
     Val a, b, c;
     int l1, l2, l3;
