@@ -1,0 +1,9 @@
+// A shape whose position is only known while running.
+// It passes the compile-time checks (its arguments are not constants)
+// and is caught by the run-time check, with its line number.
+canvas 200 100;
+ink x = 20;
+stamp 10 times {
+  circle(x, 50, 10);
+  x = x + 30;          // the 7th circle (x = 200) leaves the canvas
+}
