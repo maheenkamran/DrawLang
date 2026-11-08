@@ -196,13 +196,7 @@ static void start_block(int l)
 /* Emit a NUL-terminated global string constant; returns its id. */
 static int string_const(const char *s)
 {
-    size_t n = strlen(s);
-    fprintf(strs, "@.str%d = private unnamed_addr constant [%zu x i8] c\"", nstr, n + 1);
-    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
-        if (*p < 32 || *p > 126 || *p == '"' || *p == '\\') fprintf(strs, "\\%02X", *p);
-        else fputc(*p, strs);
-    }
-    fputs("\\00\"\n", strs);
+    (void)s;
     return nstr++;
 }
 
@@ -314,8 +308,23 @@ static Val gen_expr(const Node *e)
 
 static void gen_list(const Node *list);
 
+static void gen_shape(const Node *st)
+{
+    static const char *fn[SH_COUNT] = { "svg_circle", "svg_rect", "svg_line", "svg_triangle", "svg_text" };
+    Val vals[6];
+    int n = gen_args(st->args, vals);
+    int label = -1;
+    if (st->op == SH_TEXT) {
+        const Node *a = st->args;
+        while (a->next) a = a->next;    /* the checker guarantees a string here */
+        label = string_const(a->str);
+    }
+    fprintf(ir, "  call void @%s(i32 %d", fn[st->op], st->line);
+    for (int i = 0; i < n; i++) fprintf(ir, ", double %s", vals[i].s);
+    if (label >= 0) fprintf(ir, ", ptr @.str%d", label);
+    fputs(")\n", ir);
+}
 
-static void gen_shape(const Node *st) { (void)st; }
 static void gen_stmt(const Node *st)
 {
     Val a, b, c;
