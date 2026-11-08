@@ -196,7 +196,13 @@ static void start_block(int l)
 /* Emit a NUL-terminated global string constant; returns its id. */
 static int string_const(const char *s)
 {
-    (void)s;
+    size_t n = strlen(s);
+    fprintf(strs, "@.str%d = private unnamed_addr constant [%zu x i8] c\"", nstr, n + 1);
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+        if (*p < 32 || *p > 126 || *p == '"' || *p == '\\') fprintf(strs, "\\%02X", *p);
+        else fputc(*p, strs);
+    }
+    fputs("\\00\"\n", strs);
     return nstr++;
 }
 
