@@ -1,0 +1,37 @@
+// Patterns that return values with give, including recursion.
+canvas 420 300;
+
+pattern fib(n) {
+  when (n < 2) { give n; }
+  give fib(n - 1) + fib(n - 2);
+}
+
+pattern max(a, b) {
+  when (a > b) { give a; }
+  give b;
+}
+
+// A bar chart of the first 10 Fibonacci numbers.
+ink i = 0;
+swirl (i < 10) {
+  ink h = fib(i) * 5;
+  when (h > 100 && i % 2 == 0) { pen "teal"; }
+  otherwise when (h > 100 || i == 9) { pen "seagreen"; }
+  otherwise { pen "lightgreen"; }
+  rect(20 + i * 40, 280 - h, 30, h);
+  i = i + 1;
+}
+
+// Recursive pattern used as a statement: nested circles.
+pattern rings(x, y, r) {
+  when (r < 5) { give 0; }
+  pen "steelblue";
+  circle(x, y, r);
+  pen "white";
+  circle(x, y, r - 3);
+  rings(x, y, r - 10);
+}
+rings(80, 70, max(40, 25));
+
+pen "black";
+text(150, 40, 18, "fib(9) = 34 & rings");

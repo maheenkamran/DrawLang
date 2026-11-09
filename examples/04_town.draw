@@ -1,0 +1,43 @@
+/* A row of houses: slide moves the drawing position,
+   so the same house pattern is drawn at different places. */
+canvas 500 260;
+
+pen "skyblue";
+rect(0, 0, 500, 180);
+pen "#3a7d2c";
+rect(0, 180, 500, 80);
+pen "gold";
+circle(440, 50, 30);
+
+// style picks the wall colour; height is the wall height.
+pattern house(style, height) {
+  when (style == 0) { pen "tan"; }
+  otherwise when (style == 1) { pen "lightcoral"; }
+  otherwise { pen "#f4e3b5"; }
+  rect(10, 180 - height, 70, height);
+  pen "brown";
+  triangle(0, 180 - height, 90, 180 - height, 45, 140 - height);
+  pen "saddlebrown";
+  rect(35, 150, 20, 30);
+  pen "white";
+  rect(20, 190 - height, 15, 15);
+  rect(55, 190 - height, 15, 15);
+}
+
+ink n = 0;
+stamp 5 times {
+  house(n % 3, 60 + (n % 2) * 30);
+  slide 95 0;
+  n = n + 1;
+}
+
+// Undo the slides and draw a road with dashed markings.
+slide -475 0;
+pen "dimgray";
+rect(0, 215, 500, 30);
+pen "white";
+ink x = 10;
+swirl (x < 480) {
+  line(x, 230, x + 20, 230);
+  x = x + 40;
+}
