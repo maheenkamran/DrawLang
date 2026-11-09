@@ -35,6 +35,7 @@ static char *unquote(const char *s, int len)
 "/*"                    { BEGIN(COMMENT); }
 <COMMENT>"*/"           { BEGIN(INITIAL); }
 <COMMENT>.|\n           { }
+<COMMENT><<EOF>>        { fprintf(stderr, "%s:%d: error: unterminated comment\n", src_name, yylineno); exit(1); }
 
 [ \t\r\n]+              { /* whitespace */ }
 
@@ -69,5 +70,6 @@ static char *unquote(const char *s, int len)
 "||"                    { return OR; }
 [-+*/%<>=!(){},;]       { return yytext[0]; }
 
+.                       { fprintf(stderr, "%s:%d: error: unexpected character '%s'\n", src_name, yylineno, yytext); exit(1); }
 
 %%
